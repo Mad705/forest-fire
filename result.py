@@ -72,7 +72,8 @@ def final_run(model, inputs, device):
     saliency = get_saliency_map(model, inputs, device)
     saliency_overlay = overlay_heatmap(mask_np * 255, saliency)
 
-    band_imp = get_band_importance(model, inputs, device, n_steps=20)
+    # band_imp = get_band_importance(model, inputs, device, n_steps=20)
+    band_imp = get_band_importance(model, inputs, device)
     band_imp_img = plot_band_importance(band_imp)
 
     return mask_img, prob_img, saliency_overlay, band_imp_img, band_imp
