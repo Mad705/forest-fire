@@ -3,7 +3,7 @@ import base64
 import torch
 import numpy as np
 from PIL import Image
-from preprocess import preprocess_tif_files
+from preprocess import preprocess_tif_files, median_filter_band
 from model import Load_model
 from result import final_run
 from streamlit_image_coordinates import streamlit_image_coordinates
@@ -127,8 +127,12 @@ if "coordinates" not in st.session_state:
 
 # --- Model processing function ---
 def process_files(files):
-    inputs, band_images = preprocess_tif_files(files)
+    inputs, band_images, full_images = preprocess_tif_files(files)
+    st.session_state.full_images = full_images  # Store full images if needed later
     print(f"Preprocessed input shape: {inputs.shape}")  # Should be (5, 23, 256, 256)
+
+    if "full_images" not in st.session_state:
+        st.session_state.full_images = None
     
     # Add batch dimension and ensure correct shape
     inputs = inputs.unsqueeze(0)  # Now (1, 5, 23, 256, 256)
@@ -169,9 +173,67 @@ if (len(uploaded_files) == 5):
 
 # --- Display binarized 23rd bands horizontally ---
 if st.session_state.band_images:
-    st.markdown("---")
-    st.markdown("### 📊 Binarized 23rd Band of Each TIF File (Positive Pixels = 1)")
-    
+    # --- Display Original vs Median Filtered for Bands 1–5 ---
+    if st.session_state.full_images is not None:
+
+        st.markdown("---")
+        st.markdown("### 🎨 Original vs Median-Filtered (Bands 1–5)")
+
+        # Select day
+        day_to_show = st.slider("Select Day (1–5)", 1, 5, 1)
+        day_idx = day_to_show - 1
+
+        raw_day = st.session_state.full_images[day_idx]   # shape (23, 256, 256)
+
+        st.write(f"#### Day {day_to_show} — First 5 bands")
+
+        cols = st.columns(5)
+
+        for band in range(5):
+
+            original = raw_day[band].astype(np.float32)
+
+            # Median filter on RAW BAND
+            denoised = median_filter_band(original)
+
+            # Normalize for display
+            original_disp = 255 * (original - original.min()) / (np.ptp(original) + 1e-6)
+            original_disp = original_disp.astype(np.uint8)
+
+            denoised_disp = 255 * (denoised - denoised.min()) / (np.ptp(denoised) + 1e-6)
+            denoised_disp = denoised_disp.astype(np.uint8)
+
+            with cols[band]:
+                st.markdown(f"**Band {band+1}**")
+
+                st.image(original_disp, caption="Original", use_container_width=True)
+                st.image(denoised_disp, caption="Median Filtered", use_container_width=True)
+
+    # --- Display Original vs Median-Denoised ---
+    if st.session_state.band_images:
+        st.markdown("---")
+        #st.markdown("### 🧹 Denoising Comparison (Band 23)")
+
+        # Select a day to visualize
+        #day_to_show = st.slider("Select Day to View (1–5)", 1, 5, 1)
+
+        original_band = st.session_state.band_images[day_to_show - 1]
+        original_band_uint8 = original_band.astype(np.uint8) * 255
+        denoised_band = median_filter_band(original_band_uint8, ksize=3)
+
+        colA, colB = st.columns(2)
+        '''
+        with colA:
+            st.subheader(f"Original Band 23 – Day {day_to_show}")
+            st.image(original_band_uint8, use_container_width=True, caption="Raw (Unfiltered)")
+
+        with colB:
+            st.subheader(f"Median Filtered Band 23 – Day {day_to_show}")
+            st.image(denoised_band, use_container_width=True, caption="Median-Denoised")
+
+            st.markdown("---")
+            st.markdown("### 📊 Binarized 23rd Band of Each TIF File (Positive Pixels = 1)")
+        '''
     # Create a container for horizontal display
     st.markdown('<div class="band-display-container">', unsafe_allow_html=True)
     
