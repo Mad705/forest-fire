@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import rasterio
 import torch.nn.functional as F
+import  cv2
 
 def preprocess_tif_files(tif_files, target_size=(256, 256)):
     """
@@ -45,4 +46,11 @@ def preprocess_tif_files(tif_files, target_size=(256, 256)):
 
     return_tensor = torch.tensor(final_array, dtype=torch.float32)
     print(f"Returning tensor with shape: {return_tensor.shape}")
-    return return_tensor, band_23_images
+    return return_tensor, band_23_images , final_array
+
+def median_filter_band(image, ksize=3):
+    """
+    Apply median filtering to a single-band grayscale image.
+    """
+    image = image.astype(np.uint8) if image.max() <= 255 else image
+    return cv2.medianBlur(image,ksize)
